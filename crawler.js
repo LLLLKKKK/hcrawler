@@ -112,20 +112,35 @@ crawler.push_level(function (window) {
   var $ = window.$;
   var vessel_fields = $('td');
   var vessel_name = $('.ship-name')[0].textContent.trim();
-  var vessel_info = {};
+  var vessel_info = [];
 
-  vessel_info['Flag'] = vessel_fields[0].textContent.trim();
-  vessel_info['AIS Type'] = vessel_fields[2].textContent.trim();
-  vessel_info['Built'] = vessel_fields[3].textContent.trim();
-  vessel_info['GT'] = vessel_fields[4].textContent.trim();
-  vessel_info['DWT'] = vessel_fields[5].textContent.trim();
+  vessel_info.push(vessel_name);
 
-  vessel_info['IMO'] = vessel_fields[7].textContent.trim();
-  vessel_info['MMSI'] = vessel_fields[9].textContent.trim();
-  vessel_info['Callsign'] = vessel_fields[10].textContent.trim();
-  vessel_info['Size'] = vessel_fields[11].textContent.trim();
-  vessel_info['Draught'] = vessel_fields[12].textContent.trim();
+  vessel_info.push(vessel_fields[0].textContent.trim());
+  vessel_info.push(vessel_fields[2].textContent.trim());
+  vessel_info.push(vessel_fields[3].textContent.trim());
+  vessel_info.push(vessel_fields[4].textContent.trim());
+  vessel_info.push(vessel_fields[5].textContent.trim());
 
+  vessel_info.push(vessel_fields[7].textContent.trim());
+  vessel_info.push(vessel_fields[9].textContent.trim());
+  vessel_info.push(vessel_fields[10].textContent.trim());
+  vessel_info.push(vessel_fields[11].textContent.trim());
+  vessel_info.push(vessel_fields[12].textContent.trim());
+
+  // vessel_info['Flag'] = vessel_fields[0].textContent.trim();
+  // vessel_info['AIS Type'] = vessel_fields[2].textContent.trim();
+  // vessel_info['Built'] = vessel_fields[3].textContent.trim();
+  // vessel_info['GT'] = vessel_fields[4].textContent.trim();
+  // vessel_info['DWT'] = vessel_fields[5].textContent.trim();
+
+  // vessel_info['IMO'] = vessel_fields[7].textContent.trim();
+  // vessel_info['MMSI'] = vessel_fields[9].textContent.trim();
+  // vessel_info['Callsign'] = vessel_fields[10].textContent.trim();
+  // vessel_info['Size'] = vessel_fields[11].textContent.trim();
+  // vessel_info['Draught'] = vessel_fields[12].textContent.trim();
+
+  // vessel_info['Name'] = vessel_name;
   // vessel_info['Destination'] = vessel_fields[14].textContent;
   // vessel_info['ETA'] = vessel_fields[15].textContent;
   // vessel_info['Last report'] = vessel_fields[16].textContent;
@@ -135,33 +150,42 @@ crawler.push_level(function (window) {
   // vessels[vessel_name] = vessel_info;
   //console.log(vessel_name);
   //console.log(vessel_info);
-  vessel_info['Name'] = vessel_name;
+
 
   return vessel_info;
 });
 
 var href_array = [];
-for (var i = 1; i < 50; i++) {
+for (var i = 1; i < 2; i++) {
   href_array.push('/vessels?FullLastSeen_page=' + i);
 }
 
-var start_time = new Date().getTime();
+var start_time = new Date.getTime();
 var end_time;
 
 crawler.start(href_array, function (results) {
-  //console.log(results);
-  //console.log(results.length);
-  var end_time = new Date().getTime();
-  console.log("Time escaped: " + (start_time - end_time) / 1000 + "seconds");
+  // console.log(results);
+  // console.log(results.length);
+  var end_time = new Date().getTime(());
+  console.log('Time escaped: ' + (start_time - end_time) / 1000 + ' seconds');
 });
 
-function save_csv(data) {
-  var data = [["name1", "city1", "some other info"], ["name2", "city2", "more info"]];
-  var csvContent = "data:text/csv;charset=utf-8,";
-  data.forEach(function(infoArray, index){
+function save_csv (data) {
+  //var csvContent = "data:text/csv;charset=utf-8,";
+  var csvContent = '';
+  csvContent += ['Name', 'Flag', 'AIS Type', 'Built', 'GT', 'GWT', 'DWT',
+   'IMO', 'MMSI', 'Callsign', 'Size', 'Draught'].join(",") + '\n';
 
+  data.forEach(function (infoArray, index) {
      dataString = infoArray.join(",");
-     csvContent += index < infoArray.length ? dataString+ "\n" : dataString;
+     csvContent += index < infoArray.length ? dataString + "\n" : dataString;
+  });
 
+  fs.writeFile("out.csv", csvContent, function(err) {
+    if(err) {
+      console.log(err);
+    } else {
+      console.log("The file was saved!");
+    }
   });
 }
