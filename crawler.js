@@ -16,12 +16,20 @@ var async = require('async'),
 
   var _site = 'http://www.vesselfinder.com';
 
+  var _log_level = 'verbose';
+
+  var _conn_in_poll = 0;
+
   var _callback = function (results) {
     console.log(results);
     console.log(results.length);
   };
 
   var _fetch_with_dom = function (href, callback) {
+    if (_log_level == 'verbose') {
+      _conn_in_poll++;
+    }
+
     var req = http.get(href, function (res) {
       var data = '';
       res.setEncoding(crawler.encoding);
@@ -34,6 +42,9 @@ var async = require('async'),
           src: [jquery],
           done: callback
         });
+        if (_log_level == 'verbose') {
+          _conn_in_poll--;
+        }
       });
     }).on('error', function (e) {
       console.log(e);
@@ -63,13 +74,25 @@ var async = require('async'),
     async.mapLimit(arr, crawler.concurrency,
 
       function (item, callback) {
+        if (_log_level == 'verbose') {
+          console.log('level ' + level + ' item ' + item + ' start');
+          console.log(_conn_in_poll + ' connections in pool');
+        }
+
         _fetch_with_dom(_site + item, function(e, window) {
           var results = _level_callbacks[level](window);
+          if (_log_level == 'verbose') {
+            console.log('level ' + level + ' item ' + item + ' finished');
+          }
           callback(null, results);
         });
       },
 
       function (err, results) {
+        if (_log_level == 'verbose') {
+          console.log('level ' + level + ' finished');
+        }
+
         if (level < _level_callbacks.length - 1) {
           var merged = _merge_array(results);
           _start_level(level + 1, merged);
@@ -82,13 +105,17 @@ var async = require('async'),
 
   crawler.encoding = 'utf8';
 
-  crawler.concurrency = 5;
+  crawler.concurrency = 15;
 
   crawler.push_level = function(level_callback) {
     _level_callbacks.push(level_callback);
   };
 
   crawler.start = function(arr, callback) {
+    if (callback) {
+      _callback = callback;
+    }
+
     if (_level_callbacks.length === 0) {
       throw new Error("Empty callbacks!");
     } else {
@@ -151,23 +178,23 @@ crawler.push_level(function (window) {
   //console.log(vessel_name);
   //console.log(vessel_info);
 
-
   return vessel_info;
 });
 
 var href_array = [];
-for (var i = 1; i < 2; i++) {
+for (var i = 1; i <  247847 / 12 + 1; i++) {
   href_array.push('/vessels?FullLastSeen_page=' + i);
 }
 
-var start_time = new Date.getTime();
+var start_time = new Date().getTime();
 var end_time;
 
 crawler.start(href_array, function (results) {
   // console.log(results);
   // console.log(results.length);
-  var end_time = new Date().getTime(());
-  console.log('Time escaped: ' + (start_time - end_time) / 1000 + ' seconds');
+  var end_time = new Date().getTime();
+  console.log('Time escaped: ' + (end_time - start_time) / 1000 + ' seconds');
+  save_csv(results);
 });
 
 function save_csv (data) {
@@ -178,10 +205,10 @@ function save_csv (data) {
 
   data.forEach(function (infoArray, index) {
      dataString = infoArray.join(",");
-     csvContent += index < infoArray.length ? dataString + "\n" : dataString;
+     csvContent += dataString + "\n";
   });
 
-  fs.writeFile("out.csv", csvContent, function(err) {
+  fs.writeFile("out.csv", csvContent.substring(0, csvContent.length - 1), function(err) {
     if(err) {
       console.log(err);
     } else {
