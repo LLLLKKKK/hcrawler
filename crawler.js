@@ -20,6 +20,8 @@ var async = require('async'),
 
   var _conn_in_poll = 0;
 
+  var _counter = 0;
+
   var _callback = function (results) {
     console.log(results);
     console.log(results.length);
@@ -74,15 +76,17 @@ var async = require('async'),
     async.mapLimit(arr, crawler.concurrency,
 
       function (item, callback) {
-        if (_log_level == 'verbose') {
-          console.log('level ' + level + ' item ' + item + ' start');
-          console.log(_conn_in_poll + ' connections in pool');
-        }
+        // if (_log_level == 'verbose') {
+        //   console.log('level ' + level + ' item ' + item + ' start');
+        //   console.log(_conn_in_poll + ' connections in pool');
+        // }
 
         _fetch_with_dom(_site + item, function(e, window) {
           var results = _level_callbacks[level](window);
           if (_log_level == 'verbose') {
-            console.log('level ' + level + ' item ' + item + ' finished');
+            _counter++;
+            console.log(_counter + ' finished');
+            //console.log('level ' + level + ' item ' + item + ' finished');
           }
           callback(null, results);
         });
