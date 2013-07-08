@@ -11,7 +11,7 @@ var async = require('async'),
   var root = this;
   root.crawler = crawler;
 
-  var _level_callbacks = [];
+  var levelProcesssor = [];
 
   var _site = 'http://www.vesselfinder.com';
 
@@ -21,9 +21,9 @@ var async = require('async'),
 
   var _conn_in_poll = 0;
 
-  var _concurrency = 40;
+  var concurrency = 40;
 
-  var _counter = 0;
+  var runningCount = 0;
 
   var _results = [];
 
@@ -32,30 +32,23 @@ var async = require('async'),
     console.log(results.length);
   };
 
-  var _fetch_with_dom = function (href, callback) {
-    if (_log_level == 'verbose') {
-      _conn_in_poll++;
-    }
-
-    var req = http.get(href, function (res) {
+  var fetchPage = function (href, callback) {
+    http.get(href, function (res) {
       var data = '';
       res.setEncoding(crawler.encoding);
       res.on('data', function (chunk) {
         data += chunk;
       });
       res.on('end', function () {
-        callback(null, cheerio.load(data));
-        if (_log_level == 'verbose') {
-          _conn_in_poll--;
-        }
+        callback(data);
       });
     }).on('error', function (e) {
       console.log(e);
-      _fetch_with_dom(href, callback);
+      fetchPage(href, callback);
     });
   };
 
-  var _unique = function(arr) {
+  var unique = function(arr) {
       var a = arr.concat();
       for(var i=0; i<a.length; ++i) {
           for(var j=i+1; j<a.length; ++j) {
@@ -66,50 +59,115 @@ var async = require('async'),
       return a;
   };
 
-  var _merge_array = function (array) {
+  var mergeArray = function (array) {
     var merged_results = [];
     for (var i = array.length - 1; i >= 0; i--) {
-      merged_results = _unique(merged_results.concat(array[i]));
+      merged_results = unique(merged_results.concat(array[i]));
     }
     return merged_results;
   };
 
+  var asyncMap = function (arr, fn, reduceCallback) {
+    if (runningCount < concurrency - arr.length) {
+      //console.log('start level ' + level);
+      runningCount += arr.length;
+      for (var i = arr.length - 1; i >= 0; i--) {
+        fn.apply(null, [arr[i], reduceCallback]);
+      };
+    } else {
+      //console.log('wait for enough window');
+      setTimeout(asyncMap, 5 * 1000, arr, fn, reduceCallback);
+    }
+  };
+
+  function crawlStrategy (strategy) {
+    var summary = [];
+    return function (level, result) {
+      runningCount--;
+      
+      if (level === levelProcesssor.length - 1) {
+        summary.push(result);
+        if (runningCount === 0) {
+          _callback(summary);
+        }
+      } 
+      else {
+        startLevel(level + 1, mergeArray(result));
+      }
+    };
+  }
+
+  var _dfs = function (level, result) {
+    _results.push(result);
+    runningCount--;
+
+    //console.log(runningCount + ' finished');
+    if (runningCount === 0) {
+      
+      //var end_time = new Date().getTime();
+      //console.log(_results.length + ' results');
+      //console.log('level ' + level + ' cost ' + (end_time - start_time) / 1000 + ' seconds');
+      
+      if (level === levelProcesssor.length - 1) {
+        _callback(_results);
+      } else {
+        var level_result = mergeArray(_results);
+        _results = [];
+        _start_level(level + 1, level_result);
+      }
+    } 
+  }
+
+  var reduce = function (level) {
+    return function (data) {
+      var $ = cheerio.load(data)
+      var result = levelProcesssor[level]($);
+      
+      var summary = [];
+
+    }
+  };
+
+  var startLevel = function (level, arr) {
+    asyncMap(arr, fetchPage, reduce(level));
+  };
 
   var _start_level = function (level, arr) {
 
     var start_time = new Date().getTime();
 
-    var _level_finish_callback = function (e, $) {
-      var re_now = _level_callbacks[level]($);
+    var _level_finish_callback = function (data) {
+      var $ = cheerio.load(data)
+      var re_now = levelProcesssor[level]($);
 
       if (_level_strategy == 'dfs') {
-        console.log(_counter)
-        _counter--;
-        if (level === _level_callbacks.length - 1) {
+        console.log(runningCount)
+        runningCount--;
+        if (level === levelProcesssor.length - 1) {
           _results.push(re_now);
-          if (_counter === 0) {
+          if (runningCount === 0) {
             _callback(_results);
           }
         } else {
-          _start_level(level + 1, _merge_array(re_now));
+          _start_level(level + 1, mergeArray(re_now));
         }
       }
 
       else if (_level_strategy == 'bfs') {
         _results.push(re_now);
-        _counter--;
+        runningCount--;
 
-        console.log(_counter + ' finished');
-        if (_counter === 0) {
+        console.log(runningCount + ' finished');
+        if (runningCount === 0) {
           
           var end_time = new Date().getTime();
           console.log(_results.length + ' results');
           console.log('level ' + level + ' cost ' + (end_time - start_time) / 1000 + ' seconds');
           
-          if (level === _level_callbacks.length - 1) {
+          if (level === levelProcesssor.length - 1) {
             _callback(_results);
           } else {
-            var level_result = _merge_array(_results);
+            var level_result = mergeArray(_results);
             _results = [];
             _start_level(level + 1, level_result);
           }
@@ -122,11 +180,11 @@ var async = require('async'),
     };
     
     var wrapper = function () {
-      if (_counter < _concurrency - arr.length) {
+      if (runningCount < concurrency - arr.length) {
         console.log('start level ' + level);
-        _counter += arr.length;
+        runningCount += arr.length;
         for (var i = arr.length - 1; i >= 0; i--) {
-          _fetch_with_dom(_site + arr[i], _level_finish_callback);
+          fetchPage(_site + arr[i], _level_finish_callback);
         };
       } else {
         console.log('wait for enough window');
@@ -141,17 +199,17 @@ var async = require('async'),
   crawler.concurrency = 7;
 
   crawler.push_level = function(level_callback) {
-    _level_callbacks.push(level_callback);
+    levelProcesssor.push(level_callback);
   };
 
   crawler.start = function(arr, callback) {
     if (callback) {
       _callback = callback;
     }
-    _counter = 0;
+    runningCount = 0;
     _results = [];
 
-    if (_level_callbacks.length === 0) {
+    if (levelProcesssor.length === 0) {
       throw new Error("Empty callbacks!");
     } else {
       _start_level(0, arr);
