@@ -1,9 +1,8 @@
 
 var async = require('async'),
-    jsdom = require('jsdom'),
+    cheerio = require('cheerio'),
     http = require('http'),
-    fs = require('fs'),
-    jquery = fs.readFileSync('./jquery.js').toString();
+    fs = require('fs');
 
 (function() {
 
@@ -22,6 +21,8 @@ var async = require('async'),
 
   var _counter = 0;
 
+  var _results = [];
+
   var _callback = function (results) {
     console.log(results);
     console.log(results.length);
@@ -39,17 +40,14 @@ var async = require('async'),
         data += chunk;
       });
       res.on('end', function () {
-        jsdom.env({
-          html: data,
-          src: [jquery],
-          done: callback
-        });
+        callback(null, cheerio.load(data));
         if (_log_level == 'verbose') {
           _conn_in_poll--;
         }
       });
     }).on('error', function (e) {
       console.log(e);
+      _fetch_with_dom(href, callback);
     });
   };
 
@@ -72,44 +70,42 @@ var async = require('async'),
     return merged_results;
   };
 
+
   var _start_level = function (level, arr) {
-    async.mapLimit(arr, crawler.concurrency,
+    _results = [];
+    _counter = 0;
 
-      function (item, callback) {
-        // if (_log_level == 'verbose') {
-        //   console.log('level ' + level + ' item ' + item + ' start');
-        //   console.log(_conn_in_poll + ' connections in pool');
-        // }
+    var start_time = new Date().getTime();
 
-        _fetch_with_dom(_site + item, function(e, window) {
-          var results = _level_callbacks[level](window);
-          if (_log_level == 'verbose') {
-            _counter++;
-            console.log(_counter + ' finished');
-            //console.log('level ' + level + ' item ' + item + ' finished');
-          }
-          callback(null, results);
-        });
-      },
-
-      function (err, results) {
-        if (_log_level == 'verbose') {
-          console.log('level ' + level + ' finished');
-        }
-
-        if (level < _level_callbacks.length - 1) {
-          var merged = _merge_array(results);
-          _start_level(level + 1, merged);
+    var _level_finish_callback = function (e, $) {
+      _results.push(_level_callbacks[level]($));
+      _counter++;
+      console.log(_counter + ' finished');
+      if (_counter === arr.length) {
+        
+        var end_time = new Date().getTime();
+        console.log(_results.length + ' results');
+        console.log('level ' + level + ' cost ' + (end_time - start_time) / 1000 + ' seconds');
+        
+        if (level === _level_callbacks.length - 1) {
+          _callback(_results);
         } else {
-          _callback(results);
+          _start_level(level + 1, _merge_array(_results));
         }
-      });
-
+      }
+    };
+    
+    //console.log(arr);
+    console.log('start level ' + level);
+    
+    for (var i = arr.length - 1; i >= 0; i--) {
+      _fetch_with_dom(_site + arr[i], _level_finish_callback);
+    };
   };
 
   crawler.encoding = 'utf8';
 
-  crawler.concurrency = 15;
+  crawler.concurrency = 7;
 
   crawler.push_level = function(level_callback) {
     _level_callbacks.push(level_callback);
@@ -129,86 +125,69 @@ var async = require('async'),
 
 }());
 
-crawler.push_level(function (window) {
-  var $ = window.$;
+var parse_href = function (window) {
+  var $ = window;
   var hrefs = [];
-  $.each($('.info a'), function(k, v) {
-    hrefs.push($(v).attr('href'));
+  $('.info a').each(function (k, v) {
+    hrefs.push($(this).attr('href'));
   });
   return hrefs;
-});
+};
 
-
-crawler.push_level(function (window) {
-  var $ = window.$;
+var parse_vessel_array = function ($) {
   var vessel_fields = $('td');
-  var vessel_name = $('.ship-name')[0].textContent.trim();
+  var vessel_name = $('.ship-name').eq(0).text().trim();
   var vessel_info = [];
 
   vessel_info.push(vessel_name);
 
-  vessel_info.push(vessel_fields[0].textContent.trim());
-  vessel_info.push(vessel_fields[2].textContent.trim());
-  vessel_info.push(vessel_fields[3].textContent.trim());
-  vessel_info.push(vessel_fields[4].textContent.trim());
-  vessel_info.push(vessel_fields[5].textContent.trim());
+  vessel_info.push(vessel_fields.eq(0).text().trim());
+  vessel_info.push(vessel_fields.eq(2).text().trim());
+  vessel_info.push(vessel_fields.eq(3).text().trim());
+  vessel_info.push(vessel_fields.eq(4).text().trim());
+  vessel_info.push(vessel_fields.eq(5).text().trim());
 
-  vessel_info.push(vessel_fields[7].textContent.trim());
-  vessel_info.push(vessel_fields[9].textContent.trim());
-  vessel_info.push(vessel_fields[10].textContent.trim());
-  vessel_info.push(vessel_fields[11].textContent.trim());
-  vessel_info.push(vessel_fields[12].textContent.trim());
-
-  // vessel_info['Flag'] = vessel_fields[0].textContent.trim();
-  // vessel_info['AIS Type'] = vessel_fields[2].textContent.trim();
-  // vessel_info['Built'] = vessel_fields[3].textContent.trim();
-  // vessel_info['GT'] = vessel_fields[4].textContent.trim();
-  // vessel_info['DWT'] = vessel_fields[5].textContent.trim();
-
-  // vessel_info['IMO'] = vessel_fields[7].textContent.trim();
-  // vessel_info['MMSI'] = vessel_fields[9].textContent.trim();
-  // vessel_info['Callsign'] = vessel_fields[10].textContent.trim();
-  // vessel_info['Size'] = vessel_fields[11].textContent.trim();
-  // vessel_info['Draught'] = vessel_fields[12].textContent.trim();
-
-  // vessel_info['Name'] = vessel_name;
-  // vessel_info['Destination'] = vessel_fields[14].textContent;
-  // vessel_info['ETA'] = vessel_fields[15].textContent;
-  // vessel_info['Last report'] = vessel_fields[16].textContent;
-
-  // vessel_info['Position'] = vessel_fields[19].textContent;
-  // vessel_info['Course/Speed'] = vessel_fields[20].textContent;
-  // vessels[vessel_name] = vessel_info;
-  //console.log(vessel_name);
-  //console.log(vessel_info);
-
+  vessel_info.push(vessel_fields.eq(7).text().trim());
+  vessel_info.push(vessel_fields.eq(9).text().trim());
+  vessel_info.push(vessel_fields.eq(10).text().trim());
+  vessel_info.push(vessel_fields.eq(11).text().trim());
+  vessel_info.push(vessel_fields.eq(12).text().trim());
+  
   return vessel_info;
-});
+};
 
-var href_array = [];
-for (var i = 1; i <  247847 / 12 + 1; i++) {
-  href_array.push('/vessels?FullLastSeen_page=' + i);
-}
+var parse_vessel_object = function ($) {
+  var vessel_fields = $('td');
+  var vessel_name = $('.ship-name')[0].textContent.trim();
+  var vessel_info = [];
 
-var start_time = new Date().getTime();
-var end_time;
+  vessel_info['Flag'] = vessel_fields[0].textContent.trim();
+  vessel_info['AIS Type'] = vessel_fields[2].textContent.trim();
+  vessel_info['Built'] = vessel_fields[3].textContent.trim();
+  vessel_info['GT'] = vessel_fields[4].textContent.trim();
+  vessel_info['DWT'] = vessel_fields[5].textContent.trim();
 
-crawler.start(href_array, function (results) {
-  // console.log(results);
-  // console.log(results.length);
-  var end_time = new Date().getTime();
-  console.log('Time escaped: ' + (end_time - start_time) / 1000 + ' seconds');
-  save_csv(results);
-});
+  vessel_info['IMO'] = vessel_fields[7].textContent.trim();
+  vessel_info['MMSI'] = vessel_fields[9].textContent.trim();
+  vessel_info['Callsign'] = vessel_fields[10].textContent.trim();
+  vessel_info['Size'] = vessel_fields[11].textContent.trim();
+  vessel_info['Draught'] = vessel_fields[12].textContent.trim();
 
-function save_csv (data) {
-  //var csvContent = "data:text/csv;charset=utf-8,";
+  vessel_info['Name'] = vessel_name;
+  vessel_info['Destination'] = vessel_fields[14].textContent;
+  vessel_info['ETA'] = vessel_fields[15].textContent;
+  vessel_info['Last report'] = vessel_fields[16].textContent;
+
+  vessel_info['Position'] = vessel_fields[19].textContent;
+  vessel_info['Course/Speed'] = vessel_fields[20].textContent;
+  
+  return {vessel_name : vessel_info};
+};
+
+function save_links (data) {
   var csvContent = '';
-  csvContent += ['Name', 'Flag', 'AIS Type', 'Built', 'GT', 'GWT', 'DWT',
-   'IMO', 'MMSI', 'Callsign', 'Size', 'Draught'].join(",") + '\n';
-
   data.forEach(function (infoArray, index) {
-     dataString = infoArray.join(",");
+     dataString = infoArray.join("\n");
      csvContent += dataString + "\n";
   });
 
@@ -220,3 +199,38 @@ function save_csv (data) {
     }
   });
 }
+
+function save_csv (data, filename) {
+  var csvContent = '';
+  csvContent += ['Name', 'Flag', 'AIS Type', 'Built', 'GT', 'GWT', 'DWT',
+   'IMO', 'MMSI', 'Callsign', 'Size', 'Draught'].join(",") + '\n';
+
+  data.forEach(function (infoArray, index) {
+     dataString = infoArray.join(",");
+     csvContent += dataString + "\n";
+  });
+
+  fs.writeFile(filename, csvContent.substring(0, csvContent.length - 1), function(err) {
+    if(err) {
+      console.log(err);
+    } else {
+      console.log("The file was saved!");
+    }
+  });
+}
+
+crawler.push_level(parse_href);
+crawler.push_level(parse_vessel_array);
+
+var from = parseInt(process.argv[2]);
+var to = parseInt(process.argv[3]);
+
+var href_array = [];
+for (var i = from; i < to + 1; i++) {
+  href_array.push('/vessels?FullLastSeen_page=' + i);
+}
+
+crawler.start(href_array, function (results) {
+  save_csv(results, from + '-' + to + '.csv');
+});
+
