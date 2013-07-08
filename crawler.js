@@ -17,7 +17,11 @@ var async = require('async'),
 
   var _log_level = 'verbose';
 
+  var _level_strategy = 'bfs';
+
   var _conn_in_poll = 0;
+
+  var _concurrency = 40;
 
   var _counter = 0;
 
@@ -72,35 +76,64 @@ var async = require('async'),
 
 
   var _start_level = function (level, arr) {
-    _results = [];
-    _counter = 0;
 
     var start_time = new Date().getTime();
 
     var _level_finish_callback = function (e, $) {
-      _results.push(_level_callbacks[level]($));
-      _counter++;
-      console.log(_counter + ' finished');
-      if (_counter === arr.length) {
-        
-        var end_time = new Date().getTime();
-        console.log(_results.length + ' results');
-        console.log('level ' + level + ' cost ' + (end_time - start_time) / 1000 + ' seconds');
-        
+      var re_now = _level_callbacks[level]($);
+
+      if (_level_strategy == 'dfs') {
+        console.log(_counter)
+        _counter--;
         if (level === _level_callbacks.length - 1) {
-          _callback(_results);
+          _results.push(re_now);
+          if (_counter === 0) {
+            _callback(_results);
+          }
         } else {
-          _start_level(level + 1, _merge_array(_results));
+          _start_level(level + 1, _merge_array(re_now));
         }
+      }
+
+      else if (_level_strategy == 'bfs') {
+        _results.push(re_now);
+        _counter--;
+
+        console.log(_counter + ' finished');
+        if (_counter === 0) {
+          
+          var end_time = new Date().getTime();
+          console.log(_results.length + ' results');
+          console.log('level ' + level + ' cost ' + (end_time - start_time) / 1000 + ' seconds');
+          
+          if (level === _level_callbacks.length - 1) {
+            _callback(_results);
+          } else {
+            var level_result = _merge_array(_results);
+            _results = [];
+            _start_level(level + 1, level_result);
+          }
+        }
+      }
+
+      else {
+        throw new Error('unknown level_strategy');
       }
     };
     
-    //console.log(arr);
-    console.log('start level ' + level);
-    
-    for (var i = arr.length - 1; i >= 0; i--) {
-      _fetch_with_dom(_site + arr[i], _level_finish_callback);
+    var wrapper = function () {
+      if (_counter < _concurrency - arr.length) {
+        console.log('start level ' + level);
+        _counter += arr.length;
+        for (var i = arr.length - 1; i >= 0; i--) {
+          _fetch_with_dom(_site + arr[i], _level_finish_callback);
+        };
+      } else {
+        console.log('wait for enough window');
+        setTimeout(wrapper, 5 * 1000);
+      }
     };
+    wrapper();
   };
 
   crawler.encoding = 'utf8';
@@ -115,6 +148,8 @@ var async = require('async'),
     if (callback) {
       _callback = callback;
     }
+    _counter = 0;
+    _results = [];
 
     if (_level_callbacks.length === 0) {
       throw new Error("Empty callbacks!");
@@ -184,14 +219,14 @@ var parse_vessel_object = function ($) {
   return {vessel_name : vessel_info};
 };
 
-function save_links (data) {
+function save_links (data, filename) {
   var csvContent = '';
   data.forEach(function (infoArray, index) {
      dataString = infoArray.join("\n");
      csvContent += dataString + "\n";
   });
 
-  fs.writeFile("out.csv", csvContent.substring(0, csvContent.length - 1), function(err) {
+  fs.writeFile(filename, csvContent.substring(0, csvContent.length - 1), function(err) {
     if(err) {
       console.log(err);
     } else {
@@ -229,8 +264,14 @@ var href_array = [];
 for (var i = from; i < to + 1; i++) {
   href_array.push('/vessels?FullLastSeen_page=' + i);
 }
+// fs.readFileSync('./SHIPS.csv').toString().split('\n').forEach(
+//   function (line) {
+//     href_array.push('/vessels?name=' + line);
+//   }
+// );
 
 crawler.start(href_array, function (results) {
   save_csv(results, from + '-' + to + '.csv');
+  console.log('file saved');
 });
 
