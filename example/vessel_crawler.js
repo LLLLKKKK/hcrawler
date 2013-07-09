@@ -1,5 +1,5 @@
 
-var crawler = require('./crawler'),
+var crawler = require('../lib/hcrawler'),
     fs = require('fs');
 
 
