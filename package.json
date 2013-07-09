@@ -1,5 +1,5 @@
 { 
- "name": "HCrawler",
+ "name": "hcrawler",
   "version": "0.0.1",
   "author": "Kan Liu <kan.liu.229@gmail.com>",
   "description": "a hierachical crawler with concurrency control",
@@ -9,6 +9,10 @@
       "email": "kan.liu.229@gmail.com"
     } 
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/LLLLKKKK/hcrawler.git"
+  },
   "keywords": [
     "crawler",
     "hierachical",
