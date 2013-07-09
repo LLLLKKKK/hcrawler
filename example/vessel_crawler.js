@@ -32,7 +32,7 @@ var parse_vessel_array = function ($) {
   vessel_info.push(vessel_fields.eq(10).text().trim());
   vessel_info.push(vessel_fields.eq(11).text().trim());
   vessel_info.push(vessel_fields.eq(12).text().trim());
-  
+
   return vessel_info;
 };
 
@@ -98,28 +98,35 @@ function save_csv (data, filename) {
     }
   });
 }
-
-var from = parseInt(process.argv[2]);
-var to = parseInt(process.argv[3]);
-
 var href_array = [];
-for (var i = from; i < to + 1; i++) {
-  href_array.push(site + '/vessels?Vessel_page=' + i);
-}
-// fs.readFileSync('./SHIPS.csv').toString().split('\n').forEach(
-//   function (line) {
-//     href_array.push('/vessels?name=' + line);
-//   }
-// );
 
+// var from = parseInt(process.argv[2]);
+// var to = parseInt(process.argv[3]);
+
+
+// for (var i = from; i < to + 1; i++) {
+//   href_array.push(site + '/vessels?Vessel_page=' + i);
+// }
+
+var input = process.argv[2];
+fs.readFileSync(input).toString().split('\n').forEach(
+  function (line) {
+    if (line.trim() !== '') {
+      href_array.push(site + '/vessels?name=' + line);
+    }
+  }
+);
+
+crawler.proxy = 'http://127.0.0.1:3021';
 crawler.run(
-  href_array, 
+  href_array,
   [
     parse_href,
     parse_vessel_array
   ],
   function (results) {
-    save_csv(results, from + '-' + to + '.csv');
+    console.log(results);
+    save_csv(results, input + '.result');
   },
-  'breadth'
+  'depth'
 );
