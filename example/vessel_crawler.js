@@ -60,7 +60,7 @@ var parse_vessel_object = function ($) {
 
   vessel_info['Position'] = vessel_fields[19].textContent;
   vessel_info['Course/Speed'] = vessel_fields[20].textContent;
-  
+
   return {vessel_name : vessel_info};
 };
 
@@ -118,6 +118,7 @@ fs.readFileSync(input).toString().split('\n').forEach(
 );
 
 crawler.proxy = 'http://127.0.0.1:3021';
+//crawler.proxy = 'http://108.174.58.121:3128';
 crawler.run(
   href_array,
   [
@@ -125,7 +126,7 @@ crawler.run(
     parse_vessel_array
   ],
   function (results) {
-    console.log(results);
+    //console.log(results);
     save_csv(results, input + '.result');
   },
   'depth'
