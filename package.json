@@ -1,0 +1,23 @@
+{ 
+ "name": "HCrawler",
+  "version": "0.0.1",
+  "author": "Kan Liu <kan.liu.229@gmail.com>",
+  "description": "a hierachical crawler with concurrency control",
+  "contributors": [ 
+    {
+      "name": "Kan Liu",
+      "email": "kan.liu.229@gmail.com"
+    } 
+  ],
+  "keywords": [
+    "crawler",
+    "hierachical",
+    "level",
+    "concurrency"
+  ],
+  "dependencies" : {
+    "async"   :  "*",
+    "cheerio" :  "*"
+  },
+  "license": "MIT"
+}
