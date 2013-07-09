@@ -2,11 +2,14 @@
 var crawler = require('./crawler'),
     fs = require('fs');
 
+
+var site = 'http://www.vesselfinder.com';
+
 var parse_href = function (window) {
   var $ = window;
   var hrefs = [];
   $('.info a').each(function (k, v) {
-    hrefs.push($(this).attr('href'));
+    hrefs.push(site + $(this).attr('href'));
   });
   return hrefs;
 };
@@ -101,7 +104,7 @@ var to = parseInt(process.argv[3]);
 
 var href_array = [];
 for (var i = from; i < to + 1; i++) {
-  href_array.push('/vessels?Vessel_page=' + i);
+  href_array.push(site + '/vessels?Vessel_page=' + i);
 }
 // fs.readFileSync('./SHIPS.csv').toString().split('\n').forEach(
 //   function (line) {

@@ -14,8 +14,6 @@ var async = require('async'),
 
   var encoding = 'utf8';
 
-  var _site = 'http://www.vesselfinder.com';
-
   var concurrency = 10;
 
   var runningCount = 0;
@@ -73,7 +71,7 @@ var async = require('async'),
       if (qRun.length > 0) {
         runningCount += qRun.length;
         for (var i = qRun.length - 1; i >= 0; i--) {
-          fn.apply(null, [_site + qRun[i], reduceCallback]);
+          fn.apply(null, [qRun[i], reduceCallback]);
         };
       }
 
