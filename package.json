@@ -1,6 +1,6 @@
 { 
  "name": "hcrawler",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "author": "Kan Liu <kan.liu.229@gmail.com>",
   "description": "a hierachical crawler with concurrency control",
   "contributors": [ 
