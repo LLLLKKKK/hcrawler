@@ -1,108 +1,43 @@
 
-var async = require('async'),
-    jsdom = require('jsdom'),
-    http = require('http'),
-    fs = require('js'),
-    jquery = fs.readFileSync('./jquery.js').toString();
+var crawler = require('./crawler'),
+    fs = require('fs');
 
-vessels = {};
-
-function fetch_with_dom(href, selector) {
-  var req = http.get(href, function(res) {
-    var data = '';
-    res.setEncoding('utf8');
-    res.on('data', function(chunk) {
-      data += chunk;
-    });
-    res.on('end', function() {
-      jsdom.env({
-        html: data,
-        src: [jquery],
-        done: function(e, window) {
-          var $ = window.$;
-          $(selector).each(function() {
-            console.log($(this).text());
-          });
-        }
-      });
-    });
-  }).on('error', function(e) {
-    console.log(e);
+var parse_href = function (window) {
+  var $ = window;
+  var hrefs = [];
+  $('.info a').each(function (k, v) {
+    hrefs.push($(this).attr('href'));
   });
-}
+  return hrefs;
+};
 
-function save() {
-  var csvContent = "data:text/csv;charset=utf-8,";
-  csvContent += ['Name', 'Flag', 'AIS Type', 'Built', 'GT', 'DWT', 'IMO', 'MMSI',
-  'Callsign', 'Size', 'Draught'].join(',') + "\n";
-  for (var key in vessels) {
-    var data = [];
-    data.push(key);
-    data.push(vessels[key]['Flag']);
-    data.push(vessels[key]['AIS Type']);
-    data.push(vessels[key]['Built']);
-    data.push(vessels[key]['GT']);
-    data.push(vessels[key]['DWT']);
-    data.push(vessels[key]['IMO']);
-    data.push(vessels[key]['MMSI']);
-    data.push(vessels[key]['Callsign']);
-    data.push(vessels[key]['Size']);
-    data.push(vessels[key]['Draught']);
-    //console.log(data);
-    var dataString = data.join(",");
-    csvContent += dataString + "\n";
-  }
-  csvContent = csvContent.substring(0, csvContent.length - 1);
-  var encodedUri = encodeURI(csvContent);
-  var link = document.createElement("a");
-  link.setAttribute("href", encodedUri);
-  link.setAttribute("download", "my_data.csv");
-  link.click();
-}
+var parse_vessel_array = function ($) {
+  var vessel_fields = $('td');
+  var vessel_name = $('.ship-name').eq(0).text().trim();
+  var vessel_info = [];
 
-(function start_from(num) {
-  for (var i = num; i < num+10; i += 1) {
-    var href = 'http://www.vesselfinder.com/vessels?FullLastSeen_page='+i;
-    $.ajax({
-      url : href,
-      success: parse_href
-    });
-  };
-  if (num < 247924 / 12 + 1) {
-    setTimeout(start_from, 10000, num + 10);
-  }
-})(1);
+  vessel_info.push(vessel_name);
 
-function fetch_page(href) {
-  $.ajax({
-    url : href,
-    // error: function(xhr, status, err) {
-    //   setTimeout(fetch_page, 10000, href);
-    // },
-    success: parse_vessel
-  });
-}
+  vessel_info.push(vessel_fields.eq(0).text().trim());
+  vessel_info.push(vessel_fields.eq(2).text().trim());
+  vessel_info.push(vessel_fields.eq(3).text().trim());
+  vessel_info.push(vessel_fields.eq(4).text().trim());
+  vessel_info.push(vessel_fields.eq(5).text().trim());
 
-function parse_href(data) {
-  var doc = document.implementation.createHTMLDocument('temp');
-  doc.documentElement.innerHTML = data;
-  var infos = doc.getElementsByClassName('info');
-  for (var i = infos.length - 1; i >= 0; i--) {
-    //console.log(infos[i].getElementsByTagName('a')[0]);
-    //console.log(infos[i].getElementsByTagName('a')[0].getAttribute('href'));
-    fetch_page(infos[i].getElementsByTagName('a')[0].getAttribute('href'))
-  };
-}
-
-function parse_vessel(data) {
-  var doc = document.implementation.createHTMLDocument('temp');
-  doc.documentElement.innerHTML = data;
-  var table = doc.getElementsByTagName('table')[0];
-  var vessel_fields = table.getElementsByTagName('td');
-  var vessel_name = doc.getElementsByClassName('ship-name')[0].textContent.trim();
-  var vessel_info = {};
+  vessel_info.push(vessel_fields.eq(7).text().trim());
+  vessel_info.push(vessel_fields.eq(9).text().trim());
+  vessel_info.push(vessel_fields.eq(10).text().trim());
+  vessel_info.push(vessel_fields.eq(11).text().trim());
+  vessel_info.push(vessel_fields.eq(12).text().trim());
   
-  console.log(vessel_name);
+  return vessel_info;
+};
+
+var parse_vessel_object = function ($) {
+  var vessel_fields = $('td');
+  var vessel_name = $('.ship-name')[0].textContent.trim();
+  var vessel_info = [];
+
   vessel_info['Flag'] = vessel_fields[0].textContent.trim();
   vessel_info['AIS Type'] = vessel_fields[2].textContent.trim();
   vessel_info['Built'] = vessel_fields[3].textContent.trim();
@@ -115,12 +50,74 @@ function parse_vessel(data) {
   vessel_info['Size'] = vessel_fields[11].textContent.trim();
   vessel_info['Draught'] = vessel_fields[12].textContent.trim();
 
-  // vessel_info['Destination'] = vessel_fields[14].textContent;
-  // vessel_info['ETA'] = vessel_fields[15].textContent;
-  // vessel_info['Last report'] = vessel_fields[16].textContent;
+  vessel_info['Name'] = vessel_name;
+  vessel_info['Destination'] = vessel_fields[14].textContent;
+  vessel_info['ETA'] = vessel_fields[15].textContent;
+  vessel_info['Last report'] = vessel_fields[16].textContent;
 
-  // vessel_info['Position'] = vessel_fields[19].textContent;
-  // vessel_info['Course/Speed'] = vessel_fields[20].textContent;
-  vessels[vessel_name] = vessel_info;
-  //return vessel_info;
+  vessel_info['Position'] = vessel_fields[19].textContent;
+  vessel_info['Course/Speed'] = vessel_fields[20].textContent;
+  
+  return {vessel_name : vessel_info};
+};
+
+function save_links (data, filename) {
+  var csvContent = '';
+  data.forEach(function (infoArray, index) {
+     dataString = infoArray.join("\n");
+     csvContent += dataString + "\n";
+  });
+
+  fs.writeFile(filename, csvContent.substring(0, csvContent.length - 1), function(err) {
+    if(err) {
+      console.log(err);
+    } else {
+      console.log("The file was saved!");
+    }
+  });
 }
+
+function save_csv (data, filename) {
+  var csvContent = '';
+  csvContent += ['Name', 'Flag', 'AIS Type', 'Built', 'GT', 'GWT', 'DWT',
+   'IMO', 'MMSI', 'Callsign', 'Size', 'Draught'].join(",") + '\n';
+
+  data.forEach(function (infoArray, index) {
+     dataString = infoArray.join(",");
+     csvContent += dataString + "\n";
+  });
+
+  fs.writeFile(filename, csvContent.substring(0, csvContent.length - 1), function(err) {
+    if(err) {
+      console.log(err);
+    } else {
+      console.log("The file was saved!");
+    }
+  });
+}
+
+var from = parseInt(process.argv[2]);
+var to = parseInt(process.argv[3]);
+
+var href_array = [];
+for (var i = from; i < to + 1; i++) {
+  href_array.push('/vessels?Vessel_page=' + i);
+}
+// fs.readFileSync('./SHIPS.csv').toString().split('\n').forEach(
+//   function (line) {
+//     href_array.push('/vessels?name=' + line);
+//   }
+// );
+
+crawler.run(
+  href_array, 
+  
+  [
+    parse_href,
+    parse_vessel_array
+  ],
+
+  function (results) {
+    save_csv(results, from + '-' + to + '.csv');
+  }
+);
