@@ -14,7 +14,7 @@ var async = require('async'),
 
   var encoding = 'utf8';
 
-  var concurrency = 10;
+  var concurrency = 20;
 
   var runningCount = 0;
 

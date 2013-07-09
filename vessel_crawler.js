@@ -121,5 +121,5 @@ crawler.run(
   function (results) {
     save_csv(results, from + '-' + to + '.csv');
   },
-  'depth'
+  'breadth'
 );
