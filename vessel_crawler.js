@@ -114,13 +114,12 @@ for (var i = from; i < to + 1; i++) {
 
 crawler.run(
   href_array, 
-  
   [
     parse_href,
     parse_vessel_array
   ],
-
   function (results) {
     save_csv(results, from + '-' + to + '.csv');
-  }
+  },
+  'depth'
 );

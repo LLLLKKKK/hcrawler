@@ -147,14 +147,22 @@ var async = require('async'),
     levelProcessors.push(levelProcessor);
   };
 
-  crawler.run = function (arr, processors, callback) {
+  crawler.run = function (arr, processors, callback, strategy) {
     runningCount = 0;
     levelProcessors = processors;
+    var stat;
+
+    if (strategy == 'breadth') {
+      stat = breadthStrategy(callback);
+    }
+    else {
+      stat = depthStrategy(callback);
+    }
 
     if (levelProcessors.length === 0) {
       throw new Error("Empty callbacks!");
     } else {
-      startLevel(0, arr, breadthStrategy(callback));
+      startLevel(0, arr, stat);
     }
   };
 
